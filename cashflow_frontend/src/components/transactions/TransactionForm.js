@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-// 'NumericFormat' sudah tidak di-import di sini
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, Select, MenuItem,
   FormControl, InputLabel, Box, ToggleButtonGroup, ToggleButton, Alert, Stack, InputAdornment,
-  Radio, RadioGroup, FormControlLabel, FormLabel
+  Radio, RadioGroup, FormControlLabel, FormLabel,
+  useMediaQuery, useTheme, AppBar, Toolbar, IconButton, Typography // Import komponen baru
 } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { id } from 'date-fns/locale';
 import DescriptionIcon from '@mui/icons-material/Description';
+import CloseIcon from '@mui/icons-material/Close'; // Ikon untuk menutup
 import api from '../../api';
-// Kita hanya mengimpor komponen reusable kita
 import NumericFormatCustom from '../common/NumericFormatCustom'; 
 import useAuth from '../../hooks/useAuth';
 
@@ -48,6 +48,11 @@ const TransactionForm = ({ open, onClose, categories }) => {
     const [transferDirection, setTransferDirection] = useState('to_savings');
 
     const { summaryData, fetchSummaryData } = useAuth();
+    
+    // Mendeteksi ukuran layar
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    
 
     useEffect(() => {
         if (type !== 'transfer') {
@@ -112,69 +117,101 @@ const TransactionForm = ({ open, onClose, categories }) => {
         }
     };
 
+// Memisahkan konten form agar bisa dipakai ulang
+    const formContent = (
+        <Stack spacing={2.5} sx={{ pt: 1, px: { xs: 1, sm: 0 } }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <ToggleButtonGroup color="primary" value={type} exclusive onChange={handleTypeChange} aria-label="Transaction Type" size="small">
+                    <ToggleButton value="expense">Pengeluaran</ToggleButton>
+                    <ToggleButton value="income">Pemasukan</ToggleButton>
+                    <ToggleButton value="transfer">Transfer</ToggleButton>
+                </ToggleButtonGroup>
+            </Box>
+            
+            {error && <Alert severity="error">{error}</Alert>}
+            
+            {type === 'transfer' && (
+                <FormControl component="fieldset" sx={{ alignItems: 'center' }}>
+                    <FormLabel component="legend">Arah Transfer</FormLabel>
+                    <RadioGroup row value={transferDirection} onChange={(e) => setTransferDirection(e.target.value)}>
+                        <FormControlLabel value="to_savings" control={<Radio />} label="Ke Tabungan" />
+                        <FormControlLabel value="from_savings" control={<Radio />} label="Dari Tabungan" />
+                    </RadioGroup>
+                </FormControl>
+            )}
+            
+            <TextField
+              label="Jumlah (Rp)" value={amount} onChange={(e) => setAmount(e.target.value)}
+              name="amount" required InputProps={{ inputComponent: NumericFormatCustom, startAdornment: <InputAdornment position="start">Rp</InputAdornment> }} variant="outlined"
+            />
+            
+            <TextField
+              label={type === 'transfer' ? 'Catatan Transfer (Opsional)' : 'Deskripsi'}
+              type="text" value={description} onChange={e => setDescription(e.target.value)}
+              required={type !== 'transfer'}
+              InputProps={{ startAdornment: (<InputAdornment position="start"><DescriptionIcon /></InputAdornment>)}}
+            />
+
+            {type === 'expense' && (
+                <FormControl fullWidth required>
+                    <InputLabel>Kategori</InputLabel>
+                    <Select value={categoryId} label="Kategori" onChange={e => setCategoryId(e.target.value)}>
+                        {categories.map(cat => (<MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>))}
+                    </Select>
+                </FormControl>
+            )}
+
+            <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={id}>
+                <DatePicker
+                  label="Tanggal Transaksi" value={transactionDate}
+                  onChange={newValue => setTransactionDate(newValue)}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+            </LocalizationProvider>
+        </Stack>
+    );
+
     return (
-        <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
-            <DialogTitle>Tambah Transaksi</DialogTitle>
+        <Dialog 
+            open={open} 
+            onClose={handleClose} 
+            fullWidth 
+            maxWidth="xs"
+            // Properti ini adalah kuncinya!
+            fullScreen={isMobile}
+        >
+            {/* Tampilan Header untuk Mobile (Full-Screen) */}
+            {isMobile ? (
+                <AppBar sx={{ position: 'relative' }}>
+                    <Toolbar>
+                        <IconButton edge="start" color="inherit" onClick={handleClose} aria-label="close">
+                            <CloseIcon />
+                        </IconButton>
+                        <Typography sx={{ ml: 2, flex: 1 }} variant="h6" component="div">
+                            Tambah Transaksi
+                        </Typography>
+                        <Button autoFocus color="inherit" onClick={handleSubmit}>
+                            Simpan
+                        </Button>
+                    </Toolbar>
+                </AppBar>
+            ) : (
+                // Tampilan Header untuk Desktop (Dialog biasa)
+                <DialogTitle>Tambah Transaksi</DialogTitle>
+            )}
+
             <form onSubmit={handleSubmit}>
                 <DialogContent>
-                    <Stack spacing={2.5} sx={{ pt: 1 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                            <ToggleButtonGroup
-                              color="primary" value={type} exclusive
-                              onChange={handleTypeChange} aria-label="Transaction Type" size="small"
-                            >
-                                <ToggleButton value="expense">Pengeluaran</ToggleButton>
-                                <ToggleButton value="income">Pemasukan</ToggleButton>
-                                <ToggleButton value="transfer">Transfer</ToggleButton>
-                            </ToggleButtonGroup>
-                        </Box>
-                        
-                        {error && <Alert severity="error">{error}</Alert>}
-                        
-                        {type === 'transfer' && (
-                            <FormControl component="fieldset" sx={{ alignItems: 'center' }}>
-                                <FormLabel component="legend">Arah Transfer</FormLabel>
-                                <RadioGroup row value={transferDirection} onChange={(e) => setTransferDirection(e.target.value)}>
-                                    <FormControlLabel value="to_savings" control={<Radio />} label="Ke Tabungan" />
-                                    <FormControlLabel value="from_savings" control={<Radio />} label="Dari Tabungan" />
-                                </RadioGroup>
-                            </FormControl>
-                        )}
-                        
-                        <TextField
-                          label="Jumlah (Rp)" value={amount} onChange={(e) => setAmount(e.target.value)}
-                          name="amount" required InputProps={{ inputComponent: NumericFormatCustom, startAdornment: (<InputAdornment position="start">Rp</InputAdornment>) }} variant="outlined"
-                        />
-                        
-                        <TextField
-                          label={type === 'transfer' ? 'Catatan Transfer (Opsional)' : 'Deskripsi'}
-                          type="text" value={description} onChange={e => setDescription(e.target.value)}
-                          required={type !== 'transfer'}
-                          InputProps={{ startAdornment: (<InputAdornment position="start"><DescriptionIcon /></InputAdornment>)}}
-                        />
-
-                        {type === 'expense' && (
-                            <FormControl fullWidth required>
-                                <InputLabel>Kategori</InputLabel>
-                                <Select value={categoryId} label="Kategori" onChange={e => setCategoryId(e.target.value)}>
-                                    {categories.map(cat => (<MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>))}
-                                </Select>
-                            </FormControl>
-                        )}
-
-                        <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={id}>
-                            <DatePicker
-                              label="Tanggal Transaksi" value={transactionDate}
-                              onChange={newValue => setTransactionDate(newValue)}
-                              renderInput={(params) => <TextField {...params} />}
-                            />
-                        </LocalizationProvider>
-                    </Stack>
+                    {formContent}
                 </DialogContent>
-                <DialogActions sx={{ p: '16px 24px' }}>
-                    <Button onClick={handleClose}>Batal</Button>
-                    <Button type="submit" variant="contained">Simpan</Button>
-                </DialogActions>
+                
+                {/* Tampilan Tombol Aksi hanya untuk Desktop */}
+                {!isMobile && (
+                    <DialogActions sx={{ p: '16px 24px' }}>
+                        <Button onClick={handleClose}>Batal</Button>
+                        <Button type="submit" variant="contained">Simpan</Button>
+                    </DialogActions>
+                )}
             </form>
         </Dialog>
     );

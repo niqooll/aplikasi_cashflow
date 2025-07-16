@@ -41,27 +41,40 @@ const TransactionsPage = () => {
     }, []);
 
     useEffect(() => {
-        fetchTransactions(1);
+        fetchTransactions(page);
+    }, [page, fetchTransactions]);
+
+    useEffect(() => {
         fetchCategories();
-    // PERBAIKAN DI SINI: Tambahkan fetchTransactions ke dalam array
-    }, [fetchTransactions, fetchCategories]);
+    }, [fetchCategories]);
     
     const handleFormClose = () => {
         setIsFormOpen(false);
-        fetchTransactions(1);
+        if (page === 1) {
+            fetchTransactions(1);
+        } else {
+            setPage(1);
+        }
         fetchSummaryData();
     };
 
     const handlePageChange = (event, value) => {
         setPage(value);
-        fetchTransactions(value);
     };
 
     return (
         <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h4">Daftar Transaksi</Typography>
-                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsFormOpen(true)}>
+            {/* --- BAGIAN HEADER DIBUAT RESPONSif --- */}
+            <Box sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', sm: 'row' },
+                justifyContent: 'space-between', 
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                gap: 2,
+                mb: 3 
+            }}>
+                <Typography variant="h4" sx={{ mb: { xs: 1, sm: 0 } }}>Daftar Transaksi</Typography>
+                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsFormOpen(true)} sx={{ width: { xs: '100%', sm: 'auto' }}}>
                     Tambah Transaksi
                 </Button>
             </Box>
