@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, Select, MenuItem,
-  FormControl, InputLabel, Box, ToggleButtonGroup, ToggleButton, Alert, Stack, InputAdornment,
-  Radio, RadioGroup, FormControlLabel, FormLabel,
-  useMediaQuery, useTheme, AppBar, Toolbar, IconButton, Typography // Import komponen baru
+    Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, Select, MenuItem,
+    FormControl, InputLabel, Box, ToggleButtonGroup, ToggleButton, Alert, Stack, InputAdornment,
+    Radio, RadioGroup, FormControlLabel, FormLabel,
+    useMediaQuery, useTheme, AppBar, Toolbar, IconButton, Typography
 } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { id } from 'date-fns/locale';
 import DescriptionIcon from '@mui/icons-material/Description';
-import CloseIcon from '@mui/icons-material/Close'; // Ikon untuk menutup
+import CloseIcon from '@mui/icons-material/Close';
+
 import api from '../../api';
-import NumericFormatCustom from '../common/NumericFormatCustom'; 
+import NumericFormatCustom from '../common/NumericFormatCustom';
 import useAuth from '../../hooks/useAuth';
+// --- 1. IMPORT YANG BENAR UNTUK IKON ---
+import { iconComponents } from '../../utils/iconMap';
 
 const generatePayload = (formState) => {
     const { type, amount, description, categoryId, transactionDate, transferDirection } = formState;
@@ -31,7 +34,8 @@ const generatePayload = (formState) => {
 
     return {
         type: finalType,
-        amount,
+        // Pastikan amount dikirim sebagai angka, bukan string dengan format
+        amount: parseFloat(amount) || 0,
         description: finalDescription,
         transaction_date: transactionDate.toISOString().split('T')[0],
         category_id: type === 'expense' ? categoryId : null,
@@ -45,15 +49,14 @@ const TransactionForm = ({ open, onClose, categories }) => {
     const [categoryId, setCategoryId] = useState('');
     const [transactionDate, setTransactionDate] = useState(new Date());
     const [error, setError] = useState('');
+    const [isSaving, setIsSaving] = useState(false); // State untuk loading
     const [transferDirection, setTransferDirection] = useState('to_savings');
 
     const { summaryData, fetchSummaryData } = useAuth();
     
-    // Mendeteksi ukuran layar
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     
-
     useEffect(() => {
         if (type !== 'transfer') {
             setTransferDirection('to_savings');
@@ -74,6 +77,7 @@ const TransactionForm = ({ open, onClose, categories }) => {
         setCategoryId('');
         setTransactionDate(new Date());
         setError('');
+        setIsSaving(false);
         setTransferDirection('to_savings');
     }
 
@@ -83,12 +87,13 @@ const TransactionForm = ({ open, onClose, categories }) => {
     }
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         setError('');
+        setIsSaving(true);
 
         const mainBalance = summaryData?.main_balance ?? 0;
         const savingsBalance = summaryData?.savings_balance ?? 0;
-        const transactionAmount = parseFloat(amount);
+        const transactionAmount = parseFloat(amount) || 0;
         
         const isExpenseOutflow = type === 'expense';
         const isTransferToSavings = type === 'transfer' && transferDirection === 'to_savings';
@@ -96,11 +101,13 @@ const TransactionForm = ({ open, onClose, categories }) => {
 
         if ((isExpenseOutflow || isTransferToSavings) && transactionAmount > mainBalance) {
             setError(`Saldo utama tidak mencukupi. Saldo Anda: Rp ${mainBalance.toLocaleString('id-ID')}`);
+            setIsSaving(false);
             return;
         }
 
         if (isTransferFromSavings && transactionAmount > savingsBalance) {
             setError(`Saldo tabungan tidak mencukupi. Saldo Anda: Rp ${savingsBalance.toLocaleString('id-ID')}`);
+            setIsSaving(false);
             return;
         }
         
@@ -114,10 +121,11 @@ const TransactionForm = ({ open, onClose, categories }) => {
             const errorMsg = err.response?.data?.msg || `Gagal menambahkan transaksi`;
             setError(errorMsg);
             console.error(err);
+        } finally {
+            setIsSaving(false);
         }
     };
 
-// Memisahkan konten form agar bisa dipakai ulang
     const formContent = (
         <Stack spacing={2.5} sx={{ pt: 1, px: { xs: 1, sm: 0 } }}>
             <Box sx={{ display: 'flex', justifyContent: 'center' }}>
@@ -141,31 +149,53 @@ const TransactionForm = ({ open, onClose, categories }) => {
             )}
             
             <TextField
-              label="Jumlah (Rp)" value={amount} onChange={(e) => setAmount(e.target.value)}
-              name="amount" required InputProps={{ inputComponent: NumericFormatCustom, startAdornment: <InputAdornment position="start">Rp</InputAdornment> }} variant="outlined"
+                label="Jumlah (Rp)"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                name="amount"
+                required
+                InputProps={{
+                    inputComponent: NumericFormatCustom,
+                    startAdornment: <InputAdornment position="start">Rp</InputAdornment>
+                }}
+                variant="outlined"
             />
             
             <TextField
-              label={type === 'transfer' ? 'Catatan Transfer (Opsional)' : 'Deskripsi'}
-              type="text" value={description} onChange={e => setDescription(e.target.value)}
-              required={type !== 'transfer'}
-              InputProps={{ startAdornment: (<InputAdornment position="start"><DescriptionIcon /></InputAdornment>)}}
+                label={type === 'transfer' ? 'Catatan Transfer (Opsional)' : 'Deskripsi'}
+                type="text"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                required={type !== 'transfer'}
+                InputProps={{
+                    startAdornment: (<InputAdornment position="start"><DescriptionIcon /></InputAdornment>)
+                }}
             />
 
             {type === 'expense' && (
                 <FormControl fullWidth required>
                     <InputLabel>Kategori</InputLabel>
                     <Select value={categoryId} label="Kategori" onChange={e => setCategoryId(e.target.value)}>
-                        {categories.map(cat => (<MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>))}
+                        {categories.map(cat => (
+                            <MenuItem key={cat.id} value={cat.id}>
+                                {/* --- 2. CARA RENDER IKON YANG BENAR --- */}
+                                {(() => {
+                                    const Icon = iconComponents[cat.icon_name] || iconComponents.Default;
+                                    return <Icon sx={{ mr: 1.5, verticalAlign: 'middle', fontSize: '20px' }} />;
+                                })()}
+                                {cat.name}
+                            </MenuItem>
+                        ))}
                     </Select>
                 </FormControl>
             )}
 
             <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={id}>
                 <DatePicker
-                  label="Tanggal Transaksi" value={transactionDate}
-                  onChange={newValue => setTransactionDate(newValue)}
-                  renderInput={(params) => <TextField {...params} />}
+                    label="Tanggal Transaksi"
+                    value={transactionDate}
+                    onChange={newValue => setTransactionDate(newValue)}
+                    renderInput={(params) => <TextField {...params} />}
                 />
             </LocalizationProvider>
         </Stack>
@@ -177,10 +207,8 @@ const TransactionForm = ({ open, onClose, categories }) => {
             onClose={handleClose} 
             fullWidth 
             maxWidth="xs"
-            // Properti ini adalah kuncinya!
             fullScreen={isMobile}
         >
-            {/* Tampilan Header untuk Mobile (Full-Screen) */}
             {isMobile ? (
                 <AppBar sx={{ position: 'relative' }}>
                     <Toolbar>
@@ -190,29 +218,30 @@ const TransactionForm = ({ open, onClose, categories }) => {
                         <Typography sx={{ ml: 2, flex: 1 }} variant="h6" component="div">
                             Tambah Transaksi
                         </Typography>
-                        <Button autoFocus color="inherit" onClick={handleSubmit}>
-                            Simpan
+                        {/* --- 3. ONCLICK DAN LOADING STATE UNTUK TOMBOL SIMPAN MOBILE --- */}
+                        <Button autoFocus color="inherit" onClick={handleSubmit} disabled={isSaving}>
+                            {isSaving ? 'Menyimpan...' : 'Simpan'}
                         </Button>
                     </Toolbar>
                 </AppBar>
             ) : (
-                // Tampilan Header untuk Desktop (Dialog biasa)
                 <DialogTitle>Tambah Transaksi</DialogTitle>
             )}
 
-            <form onSubmit={handleSubmit}>
-                <DialogContent>
-                    {formContent}
-                </DialogContent>
-                
-                {/* Tampilan Tombol Aksi hanya untuk Desktop */}
-                {!isMobile && (
-                    <DialogActions sx={{ p: '16px 24px' }}>
-                        <Button onClick={handleClose}>Batal</Button>
-                        <Button type="submit" variant="contained">Simpan</Button>
-                    </DialogActions>
-                )}
-            </form>
+            {/* --- 4. HAPUS TAG <form> YANG BERLEBIHAN --- */}
+            <DialogContent>
+                {formContent}
+            </DialogContent>
+            
+            {!isMobile && (
+                <DialogActions sx={{ p: '16px 24px' }}>
+                    <Button onClick={handleClose}>Batal</Button>
+                    {/* --- 5. ONCLICK DAN LOADING STATE UNTUK TOMBOL SIMPAN DESKTOP --- */}
+                    <Button onClick={handleSubmit} variant="contained" disabled={isSaving}>
+                        {isSaving ? 'Menyimpan...' : 'Simpan'}
+                    </Button>
+                </DialogActions>
+            )}
         </Dialog>
     );
 };

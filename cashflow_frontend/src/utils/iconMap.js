@@ -1,32 +1,42 @@
-import React from 'react';
-import FastfoodIcon from '@mui/icons-material/Fastfood';
-import CommuteIcon from '@mui/icons-material/Commute';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import TheaterComedyIcon from '@mui/icons-material/TheaterComedy';
+// src/utils/iconMap.js
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
+import FastfoodIcon from '@mui/icons-material/Fastfood';
 import SchoolIcon from '@mui/icons-material/School';
-import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
-import FitnessCenterIcon from '@mui/icons-material/FitnessCenter';
-import PetsIcon from '@mui/icons-material/Pets';
-import CardGiftcardIcon from '@mui/icons-material/CardGiftcard';
 import HomeIcon from '@mui/icons-material/Home';
+import CommuteIcon from '@mui/icons-material/Commute';
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
+import AttractionsIcon from '@mui/icons-material/Attractions';
+import CheckroomIcon from '@mui/icons-material/Checkroom';
+import FitnessCenterIcon from '@mui/icons-material/FitnessCenter';
+import PaidIcon from '@mui/icons-material/Paid';
+import SavingsIcon from '@mui/icons-material/Savings';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline'; // Ikon default
 
-// Peta dari string ke Komponen Ikon
 export const iconComponents = {
-  FastfoodIcon: <FastfoodIcon />,
-  CommuteIcon: <CommuteIcon />,
-  ReceiptLongIcon: <ReceiptLongIcon />,
-  TheaterComedyIcon: <TheaterComedyIcon />,
-  ShoppingCartIcon: <ShoppingCartIcon />,
-  HealthAndSafetyIcon: <HealthAndSafetyIcon />,
-  SchoolIcon: <SchoolIcon />,
-  FitnessCenterIcon: <FitnessCenterIcon />,
-  PetsIcon: <PetsIcon />,
-  CardGiftcardIcon: <CardGiftcardIcon />,
-  HomeIcon: <HomeIcon />,
-  MoreHorizIcon: <MoreHorizIcon />,
+    ShoppingCart: ShoppingCartIcon,
+    Fastfood: FastfoodIcon,
+    School: SchoolIcon,
+    Home: HomeIcon,
+    Commute: CommuteIcon,
+    MedicalServices: MedicalServicesIcon,
+    Entertainment: AttractionsIcon,
+    Apparel: CheckroomIcon,
+    Health: FitnessCenterIcon,
+    Salary: PaidIcon,
+    Savings: SavingsIcon,
+    Default: HelpOutlineIcon
 };
 
-// Daftar nama ikon untuk ditampilkan di pilihan
-export const availableIcons = Object.keys(iconComponents);
+export const availableIcons = [
+    'ShoppingCart',
+    'Fastfood',
+    'School',
+    'Home',
+    'Commute',
+    'MedicalServices',
+    'Entertainment',
+    'Apparel',
+    'Health',
+    'Salary',
+    'Savings',
+];
