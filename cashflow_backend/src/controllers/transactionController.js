@@ -137,3 +137,60 @@ exports.updateTransactionStatus = async (req, res) => {
         res.status(500).send('Server Error');
     }
 };
+
+exports.getTransactions = async (req, res) => {
+    const userId = req.user.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
+    // --- PERUBAHAN DIMULAI ---
+    const { year, month } = req.query;
+
+    let dateFilterClause = '';
+    let queryParams = [userId];
+
+    if (year && month) {
+        dateFilterClause = `AND t.transaction_date >= $${queryParams.length + 1} AND t.transaction_date < $${queryParams.length + 2}`;
+        const startDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+        const endDate = new Date(parseInt(year, 10), parseInt(month, 10), 1);
+        queryParams.push(startDate.toISOString().split('T')[0]);
+        queryParams.push(endDate.toISOString().split('T')[0]);
+    }
+    
+    const limitOffsetParams = `LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    queryParams.push(limit, offset);
+    // --- PERUBAHAN SELESAI ---
+
+    try {
+        const transactionsQuery = `
+            SELECT t.id, t.amount, t.description, t.transaction_date, t.status, t.type,
+                   c.name as category_name, c.icon_name
+            FROM transactions t
+            LEFT JOIN categories c ON t.category_id = c.id
+            WHERE t.user_id = $1 ${dateFilterClause}
+            ORDER BY t.transaction_date DESC, t.id DESC
+            ${limitOffsetParams}
+        `;
+        // --- PERUBAHAN DIMULAI ---
+        const transactionsResult = await db.query(transactionsQuery, queryParams);
+
+        const countQuery = `SELECT COUNT(*) FROM transactions t WHERE t.user_id = $1 ${dateFilterClause}`;
+        const countParams = queryParams.slice(0, -2); // Hapus limit dan offset dari params
+        const countResult = await db.query(countQuery, countParams);
+        // --- PERUBAHAN SELESAI ---
+        
+        const totalTransactions = parseInt(countResult.rows[0].count);
+        const totalPages = Math.ceil(totalTransactions / limit);
+
+        res.json({
+            transactions: transactionsResult.rows,
+            currentPage: page,
+            totalPages: totalPages
+        });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};

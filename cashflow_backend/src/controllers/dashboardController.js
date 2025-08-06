@@ -1,8 +1,25 @@
 // src/controllers/dashboardController.js
 const db = require('../config/db');
 
+// Fungsi helper untuk mendapatkan tanggal awal dan akhir bulan dari query
+const getMonthDateRange = (year, month) => {
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0);
+  return { startDate, endDate };
+};
+
+
 exports.getSummary = async (req, res) => {
   const userId = req.user.id;
+  // --- PERUBAHAN DIMULAI ---
+  const { year, month } = req.query;
+
+  // Jika tidak ada query, gunakan tanggal saat ini. Jika ada, gunakan tanggal dari query.
+  const targetDate = (year && month) 
+    ? `'${parseInt(year, 10)}-${parseInt(month, 10)}-01'` 
+    : 'current_date';
+  // --- PERUBAHAN SELESAI ---
+  
   try {
     const query = `
       WITH monthly_summary AS (
@@ -12,8 +29,10 @@ exports.getSummary = async (req, res) => {
         FROM transactions
         WHERE
           user_id = $1 AND
-          transaction_date >= date_trunc('month', current_date) AND
-          transaction_date < date_trunc('month', current_date) + interval '1 month' AND
+          -- --- PERUBAHAN DIMULAI ---
+          transaction_date >= date_trunc('month', ${targetDate}::date) AND
+          transaction_date < date_trunc('month', ${targetDate}::date) + interval '1 month' AND
+          -- --- PERUBAHAN SELESAI ---
           type IN ('income', 'expense')
       ),
       balance_summary AS (
@@ -41,14 +60,24 @@ exports.getSummary = async (req, res) => {
 
 exports.getCategoryPieChart = async (req, res) => {
   const userId = req.user.id;
+  // --- PERUBAHAN DIMULAI ---
+  const { year, month } = req.query;
+
+  const targetDate = (year && month) 
+    ? `'${parseInt(year, 10)}-${parseInt(month, 10)}-01'` 
+    : 'current_date';
+  // --- PERUBAHAN SELESAI ---
+
   try {
     const pieChartData = await db.query(
       `SELECT c.name as category_name, SUM(t.amount) as total
        FROM transactions t
        JOIN categories c ON t.category_id = c.id
        WHERE t.user_id = $1 AND t.type = 'expense' AND
-             t.transaction_date >= date_trunc('month', current_date) AND
-             t.transaction_date < date_trunc('month', current_date) + interval '1 month'
+             -- --- PERUBAHAN DIMULAI ---
+             t.transaction_date >= date_trunc('month', ${targetDate}::date) AND
+             t.transaction_date < date_trunc('month', ${targetDate}::date) + interval '1 month'
+             -- --- PERUBAHAN SELESAI ---
        GROUP BY c.name
        ORDER BY total DESC`,
       [userId]
@@ -60,24 +89,62 @@ exports.getCategoryPieChart = async (req, res) => {
   }
 };
 
+exports.getExpenseTrend = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const query = `
+      WITH three_months AS (
+        SELECT date_trunc('month', generate_series(
+          current_date - interval '2 months', -- <-- UBAH DI SINI (dari '5 months')
+          current_date,
+          '1 month'
+        )) AS month
+      )
+      SELECT
+        to_char(sm.month, 'YYYY-MM') AS month,
+        COALESCE(SUM(t.amount), 0) AS total_expense
+      FROM three_months sm
+      LEFT JOIN transactions t ON date_trunc('month', t.transaction_date) = sm.month
+        AND t.user_id = $1
+        AND t.type = 'expense'
+      GROUP BY sm.month
+      ORDER BY sm.month;
+    `;
+    const result = await db.query(query, [userId]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+};
+
 exports.getBudgetsSummary = async (req, res) => {
     const userId = req.user.id;
+    // --- PERUBAHAN DIMULAI ---
+    const { year, month } = req.query;
+
+    const targetDate = (year && month) 
+      ? `'${parseInt(year, 10)}-${parseInt(month, 10)}-01'` 
+      : 'current_date';
+    // --- PERUBAHAN SELESAI ---
     try {
         const query = `
             SELECT 
                 c.id, 
                 c.name, 
                 c.budget, 
-                c.icon_name, -- PERBAIKAN 1: Ambil kolom icon_name
+                c.icon_name,
                 COALESCE(SUM(t.amount), 0) as spent
             FROM categories c
             LEFT JOIN transactions t ON c.id = t.category_id 
                 AND t.type = 'expense' 
-                AND t.transaction_date >= date_trunc('month', current_date)
-                AND t.transaction_date < date_trunc('month', current_date) + interval '1 month'
+                -- --- PERUBAHAN DIMULAI ---
+                AND t.transaction_date >= date_trunc('month', ${targetDate}::date)
+                AND t.transaction_date < date_trunc('month', ${targetDate}::date) + interval '1 month'
+                -- --- PERUBAHAN SELESAI ---
             WHERE 
                 (c.user_id = $1 OR c.is_default = TRUE) AND c.budget > 0
-            GROUP BY c.id, c.name, c.budget, c.icon_name -- PERBAIKAN 2: Tambahkan icon_name di GROUP BY
+            GROUP BY c.id, c.name, c.budget, c.icon_name
             ORDER BY c.name;
         `;
         const result = await db.query(query, [userId]);
