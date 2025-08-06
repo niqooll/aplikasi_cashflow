@@ -3,25 +3,22 @@ import { Box, Typography, LinearProgress, Paper, Stack, Alert, Tooltip, Grid, Av
 import { alpha } from '@mui/material/styles';
 import api from '../../api';
 import useAuth from '../../hooks/useAuth';
-
-// 1. IMPORT PETA IKON YANG BENAR DARI FILE UTILS
 import { iconComponents } from '../../utils/iconMap';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 
-
-// 2. OBJEK 'categoryIcons' YANG STATIS SUDAH DIHAPUS DARI SINI
-
-
-const BudgetProgress = () => {
+const BudgetProgress = ({ selectedDate }) => {
     const [budgets, setBudgets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const { fetchSummaryData } = useAuth();
 
-    const fetchBudgets = useCallback(async () => {
+    const fetchBudgets = useCallback(async (date) => {
         try {
             setLoading(true);
-            const res = await api.get('/dashboard/budgets');
+            // --- KIRIM PARAMETER TANGGAL KE API ---
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const res = await api.get('/dashboard/budgets', { params: { year, month } });
             setBudgets(res.data);
         } catch (error) {
             console.error("Gagal memuat data budget", error);
@@ -32,14 +29,11 @@ const BudgetProgress = () => {
     }, []);
 
     useEffect(() => {
-        fetchBudgets();
-        const interval = setInterval(() => {
-            fetchBudgets();
-            fetchSummaryData();
-        }, 60000); 
-        return () => clearInterval(interval);
-    }, [fetchBudgets, fetchSummaryData]);
-
+        // --- GUNAKAN `selectedDate` DARI PROPS ---
+        if (selectedDate) {
+            fetchBudgets(selectedDate);
+        }
+    }, [fetchBudgets, selectedDate]);
     const getProgressColor = (value) => {
         if (value >= 100) return 'error';
         if (value > 80) return 'warning';

@@ -9,18 +9,19 @@ export const AuthProvider = ({ children }) => {
   const [authLoading, setAuthLoading] = useState(true);
   const [summaryData, setSummaryData] = useState(null);
 
-  const fetchSummaryData = useCallback(async () => {
-    // Pastikan hanya fetch jika ada token
+  // --- PERUBAHAN DIMULAI ---
+  const fetchSummaryData = useCallback(async (params = {}) => {
     if (!localStorage.getItem('token')) return;
 
     try {
-        const res = await api.get('/dashboard/summary');
+        const res = await api.get('/dashboard/summary', { params }); // Kirim params ke API
         setSummaryData(res.data);
     } catch (error) {
         console.error("Gagal memuat data summary", error);
-        setSummaryData(null); // Set null jika gagal
+        setSummaryData(null);
     }
   }, []);
+  // --- PERUBAHAN SELESAI ---
 
   useEffect(() => {
     const token = localStorage.getItem('token');

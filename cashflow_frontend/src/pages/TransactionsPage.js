@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography, Button, CircularProgress, Alert, Pagination, Stack } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, Alert, Pagination, Stack, TextField } from '@mui/material'; // Tambah TextField
 import AddIcon from '@mui/icons-material/Add';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'; // Tambah import
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers'; // Tambah import
+import { id } from 'date-fns/locale'; // Tambah import
 import api from '../api';
 import TransactionList from '../components/transactions/TransactionList';
 import TransactionForm from '../components/transactions/TransactionForm';
@@ -16,10 +19,23 @@ const TransactionsPage = () => {
     const [totalPages, setTotalPages] = useState(1);
     const { fetchSummaryData } = useAuth();
 
-    const fetchTransactions = useCallback(async (currentPage = 1) => {
+    const [selectedDate, setSelectedDate] = useState(new Date());
+
+    const fetchTransactions = useCallback(async (currentPage = 1, date) => {
         try {
             setLoading(true);
-            const res = await api.get(`/transactions?page=${currentPage}&limit=10`);
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+
+            const res = await api.get(`/transactions`, {
+                params: {
+                    page: currentPage,
+                    limit: 10,
+                    year,
+                    month
+                }
+            });
+
             setTransactions(res.data.transactions);
             setTotalPages(res.data.totalPages);
             setPage(res.data.currentPage);
@@ -41,8 +57,8 @@ const TransactionsPage = () => {
     }, []);
 
     useEffect(() => {
-        fetchTransactions(page);
-    }, [page, fetchTransactions]);
+        fetchTransactions(page, selectedDate);
+    }, [page, selectedDate, fetchTransactions]);
 
     useEffect(() => {
         fetchCategories();
@@ -50,11 +66,7 @@ const TransactionsPage = () => {
     
     const handleFormClose = () => {
         setIsFormOpen(false);
-        if (page === 1) {
-            fetchTransactions(1);
-        } else {
-            setPage(1);
-        }
+        fetchTransactions(page, selectedDate);
         fetchSummaryData();
     };
 
@@ -64,7 +76,6 @@ const TransactionsPage = () => {
 
     return (
         <Box>
-            {/* --- BAGIAN HEADER DIBUAT RESPONSif --- */}
             <Box sx={{ 
                 display: 'flex', 
                 flexDirection: { xs: 'column', sm: 'row' },
@@ -74,9 +85,25 @@ const TransactionsPage = () => {
                 mb: 3 
             }}>
                 <Typography variant="h4" sx={{ mb: { xs: 1, sm: 0 } }}>Daftar Transaksi</Typography>
-                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsFormOpen(true)} sx={{ width: { xs: '100%', sm: 'auto' }}}>
-                    Tambah Transaksi
-                </Button>
+                
+                {/* --- TAMBAHKAN DATE PICKER DI SINI --- */}
+                <Stack direction="row" spacing={2} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+                    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={id}>
+                        <DatePicker
+                            views={['year', 'month']}
+                            label="Pilih Bulan & Tahun"
+                            value={selectedDate}
+                            onChange={(newDate) => {
+                                setSelectedDate(newDate || new Date());
+                                setPage(1); // Reset ke halaman 1 saat ganti bulan
+                            }}
+                            renderInput={(params) => <TextField {...params} size="small" />}
+                        />
+                    </LocalizationProvider>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsFormOpen(true)} sx={{ flexShrink: 0 }}>
+                        Tambah
+                    </Button>
+                </Stack>
             </Box>
             
             {error && <Alert severity="error">{error}</Alert>}
@@ -85,7 +112,7 @@ const TransactionsPage = () => {
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>
             ) : (
                 <Stack spacing={2}>
-                    <TransactionList transactions={transactions} refreshTransactions={() => fetchTransactions(page)} />
+                    <TransactionList transactions={transactions} refreshTransactions={() => fetchTransactions(page, selectedDate)} />
                     {totalPages > 1 && (
                         <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
                             <Pagination 
